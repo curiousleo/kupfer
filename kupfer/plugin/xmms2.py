@@ -11,7 +11,6 @@ __author__ = "Leonhard Markert <leo.markert@web.de>"
 
 # TODO: Add shuffle, repeat settings
 # TODO: Add playlist support
-# TODO: Thunderbird plugin: Multiple recipients -- send to list of people
 
 import itertools
 import gio
