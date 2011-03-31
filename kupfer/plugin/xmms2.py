@@ -271,8 +271,8 @@ class AlbumLeaf (TrackCollection):
 
 	def _get_thumb_local(self):
 		# try local filesystem
-		uri = urllib.unquote_plus(str(self.object[0]["url"]))
-		gfile = gio.File(uri)
+		fpath = self.object[0]["url"].replace("file://", "")
+		gfile = gio.File(fpath)
 		cover_names = ("album.jpg", "cover.jpg", ".folder.jpg")
 		for cover_name in cover_names:
 			cfile = gfile.resolve_relative_path("../" + cover_name)
@@ -281,25 +281,25 @@ class AlbumLeaf (TrackCollection):
 
 	def _get_thumb_metadata(self):
 		# Using mutagen
-		# FIXME: This is ugly
 		# TODO: Add ogg vorbis, flac, ... 
-		uri = urllib.unquote_plus(str(self.object[0]["url"])).replace("file://", "")
-		ext = os_path.splitext(uri)[1][1:].lower()
+		pic = ""
+		fpath = self.object[0]["url"].replace("file://", "")
+		ext = os_path.splitext(fpath)[1][1:].lower()
 		if (ext == "m4a" or ext == "mp4" or ext == "aac"):
-			mp4info = MP4(uri)
+			mp4info = MP4(fpath)
 			try:
 				pic = mp4info["covr"][0]
 			except(KeyError):
 				return None
 		elif ext == "mp3":
 			# add mime type differentiation
-			mp3info = MP3(uri)
+			mp3info = MP3(fpath)
 			try:
 				pic = str(mp3info.tags.getall("APIC")[0].data)
 			except(IndexError):
 				return None
 
-		return pic
+		if pic: return pic
 
 	def get_thumbnail(self, width, height):
 		# FIXME: This is ugly and does not work the way I expect
@@ -423,7 +423,7 @@ class XMMS2Source (AppLeafContentMixin, Source):
 	def get_items(self):
 		try:
 			dbfile = xmms2_support.get_xmms2_dbfile()
-			if dbfile: songs = xmms2_support.get_xmms2_songs(dbfile)
+			if dbfile: songs = list(xmms2_support.get_xmms2_songs(dbfile))
 		except StandardError, e:
 			self.output_error(e)
 			songs = []
