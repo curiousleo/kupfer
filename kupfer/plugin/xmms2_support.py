@@ -4,14 +4,19 @@ from os import path as os_path
 import sqlite3
 import urllib
 
-NEEDED_KEYS= set(("id", "title", "artist", "album", "tracknr", "url"))
+NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
+
+def _tourl(rawurl):
+	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
 def get_xmms2_dbfile():
+	"""Returns default path of xmms2 media library if it exists"""
 	dbfile = os_path.expanduser("~/.config/xmms2/medialib.db")
 	if os_path.exists(dbfile):
 		return dbfile
 
 def get_xmms2_songs(dbfile):
+	"""Get songs from xmms2 media library (sqlite). Generator function."""
 	db = sqlite3.connect(dbfile)
 	cu = db.execute("""
 			SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
@@ -20,16 +25,15 @@ def get_xmms2_songs(dbfile):
 			AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
 	""")
 
-	songs = []
-
 	for row in cu:
+		# NEEDED_KEYS and returned rows must have the same order for this to work
 		song = dict(zip((NEEDED_KEYS), row))
-		song["url"] = urllib.unquote_plus(str(song["url"]))
-		songs.append(song)
+		# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
+		song["url"] = _tourl(song["url"])
+		# Generator
+		yield song
 
 	db.close()
-
-	return songs
 
 def sort_album(album):
 	"""Sort album in track order"""
