@@ -44,8 +44,8 @@ Not Released Yet
 
 * *Thunar*: Use Thunar 1.2's Copy and Move API.
 
-    + These allow copying and moving anything through thunar,
-      and it will show progress dialogs for longer transactions.
+  + These allow copying and moving anything through thunar, and it will
+    show progress dialogs for longer transactions.
 
 * Add *Ascii & Unicode Icon Set* for fun
 
@@ -100,11 +100,25 @@ Not Released Yet
 * The *Favorites* plugin lists *Kupfer Help* and *Kupfer Preferences* by
   default (for new users), so that it's not empty and those items are ranked
   higher.
+
+* In free-text mode, show a character count in the text entry.
+
+* The action *Go To* on applications has changed implementation. It will
+  first bring to front all the application's windows on the current
+  workspace, and upon the next invocations it will focus the other
+  workspaces, in order, if they have windows from the same application.  For
+  single-window applications, nothing is changed.
  
 * Localization updates:
 
-  + ..
-
+  + (cs) Marek Černocký
+  + (de) Mario Blättermann
+  + (es) Daniel Mustieles
+  + (ko) Kim Boram 김보람
+  + (nb) Kjartan Maraas
+  + (pl) Karol Będkowski
+  + (sl) Andrej Žnidaršič
+  + (sv) Ulrik
 
 kupfer v204
 -----------
