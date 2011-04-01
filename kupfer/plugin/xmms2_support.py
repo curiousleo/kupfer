@@ -1,5 +1,10 @@
 # vim: noexpandtab 
 
+# This code is heavily based on Ulrik Sverdrup's Rhythmbox Plugin
+
+# This implementation depends on the command-line tool "nyxmms2",
+# which should come with XMMS2 by default.
+
 from os import path as os_path
 import sqlite3
 import urllib
