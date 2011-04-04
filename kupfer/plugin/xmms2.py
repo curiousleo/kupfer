@@ -20,6 +20,7 @@ import urllib
 import sqlite3
 import subprocess
 from os import path as os_path
+from contextlib import closing
 
 try:
 	from mutagen.mp3 import MP3
@@ -56,6 +57,7 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 )
 
 XMMS2 = "nyxmms2"
+NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
 
 def play_song(info):
 	song_id = info["id"]
@@ -473,13 +475,6 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield SourceLeaf
 		yield SongLeaf
 
-# Copied from xmms2_support.py
-
-NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
-
-def _tourl(rawurl):
-	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
-
 def get_xmms2_dbfile():
 	"""Returns default path of xmms2 media library if it exists"""
 	dbfile = os_path.expanduser("~/.config/xmms2/medialib.db")
@@ -488,23 +483,24 @@ def get_xmms2_dbfile():
 
 def get_xmms2_songs(dbfile):
 	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	db = sqlite3.connect(dbfile)
-	cu = db.execute("""
-			SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
-			FROM   Media A,          Media B,           Media C,          Media D,            Media E
-			WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
-			AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
-	""")
+	def _tourl(rawurl):
+		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
-	for row in cu:
-		# NEEDED_KEYS and returned rows must have the same order for this to work
-		song = dict(zip((NEEDED_KEYS), row))
-		# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
-		song["url"] = _tourl(song["url"])
-		# Generator
-		yield song
+	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
+		cu = db.execute("""
+				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
+				FROM   Media A,          Media B,           Media C,          Media D,            Media E
+				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
+				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
+		""")
 
-	db.close()
+		for row in cu:
+			# NEEDED_KEYS and returned rows must have the same order for this to work
+			song = dict(zip((NEEDED_KEYS), row))
+			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
+			song["url"] = _tourl(song["url"])
+			# Generator
+			yield song
 
 def sort_album(album):
 	"""Sort album in track order"""
