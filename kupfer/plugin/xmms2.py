@@ -23,9 +23,7 @@ from os import path as os_path
 from contextlib import closing
 
 try:
-	from mutagen.mp3 import MP3
-	from mutagen.mp4 import MP4
-	from mutagen.flac import FLAC
+	import mutagen
 	_MUTAGEN = True
 except(ImportError):
 	_MUTAGEN = False
@@ -284,6 +282,7 @@ class AlbumLeaf (TrackCollection):
 		return _("by %s") % (artist, )
 
 	def _get_thumb_local(self):
+		"Reads album art from image files in music folder."
 		# gio.File needs encoded filename
 		fpath = self.object[0]["url"].encode("utf-8")
 		gfile = gio.File(fpath)
@@ -294,49 +293,26 @@ class AlbumLeaf (TrackCollection):
 				return cfile.get_path()
 
 	def _get_thumb_metadata(self):
-		# Using mutagen
+		"Reads album art from metadata."
 		pic = ""
+		pics = []
+
 		# mutagen uses file() to read the tags
 		# file() can only read local files and uses path, not url
 		fpath = self.object[0]["url"].replace("file://", "")
-		ext = os_path.splitext(fpath)[1][1:].lower()
 
-		# TODO: Use mutagen.File?
+		finfo = mutagen.File(fpath)
+		if isinstance(finfo, mutagen.mp3.MP3):
+			pics = (apic.data for apic in finfo.tags.getall("APIC"))
+		elif isinstance(finfo, mutagen.mp4.MP4):
+			pics = finfo.tags.get("covr")
+		elif isinstance(finfo, mutagen.flac.FLAC):
+			pics = (apic.data for apic in finfo.pictures)
 
-		def _mp3_pic(fpath):
-			mp3info = MP3(fpath)
-			try:
-				pic = str(mp3info.tags.getall("APIC")[0].data)
-				return pic
-			except(IndexError):
-				return None
-
-		def _mp4_pic(fpath):
-			mp4info = MP4(fpath)
-			try:
-				pic = mp4info["covr"][0]
-				return pic
-			except(KeyError):
-				return None
-
-		def _flac_pic(fpath):
-			flacinfo = FLAC(fpath)
-			try:
-				pic = flacinfo.pictures[0].data
-				return pic
-			except(IndexError):
-				return None
-
-		pic_decoder = {
-				"mp3": _mp3_pic,
-				"mp4": _mp4_pic, "m4a": _mp4_pic, "aac": _mp4_pic,
-				"flac": _flac_pic, "fla": _flac_pic,
-				# "ogg": _oggvorbis_pic
-				}
-		
-		pic = pic_decoder[ext](fpath)
-
-		if pic: return pic
+		try:
+			pic = max(pics)
+			return pic
+		except(ValueError, TypeError): pass
 
 	def get_thumbnail(self, width, height):
 		if not (hasattr(self, "cover_data") or hasattr(self, "cover_file")):
@@ -348,10 +324,13 @@ class AlbumLeaf (TrackCollection):
 				if cover_data:
 					self.cover_data = cover_data
 
-		if hasattr(self, "cover_file"):
-			return icons.get_pixbuf_from_file(self.cover_file, width, height)
-		elif hasattr(self, "cover_data"):
-			return icons.get_pixbuf_from_data(self.cover_data, width, height)
+		try:
+			if hasattr(self, "cover_file"):
+				return icons.get_pixbuf_from_file(self.cover_file, width, height)
+			elif hasattr(self, "cover_data"):
+				return icons.get_pixbuf_from_data(self.cover_data, width, height)
+		except(glib.GError):
+			pass
 
 class ArtistAlbumsSource (CollectionSource):
 	def get_items(self):
