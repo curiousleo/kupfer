@@ -15,7 +15,7 @@ __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 # TODO: Add playlist support
 
 import itertools
-import gio
+import gio, glib
 import urllib
 import sqlite3
 import subprocess
@@ -33,8 +33,6 @@ from kupfer.objects import (Leaf, Source, AppLeaf, Action, RunnableLeaf,
 from kupfer import objects, icons, utils, uiutils, config
 from kupfer.obj.apps import AppLeafContentMixin
 from kupfer import plugin_support
-
-from time import sleep # FIXME: Needed for ugly hack
 
 __kupfer_settings__ = plugin_support.PluginSettings(
 	{
@@ -61,13 +59,24 @@ XMMS2 = "nyxmms2"
 
 def play_song(info):
 	song_id = info["id"]
+	songs = list(get_playlist_songs())
+	# Don't add song if already in playlist
+	if song_id in songs:
+		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		return
+
 	utils.spawn_async((XMMS2, "add", "id:%s" % song_id))
-	# FIXME: Ugly hack that ensure that the song is first added
+
+	def jump_and_play():
+		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		# start playing
+		utils.spawn_async((XMMS2, "play"))
+		# must return False so it's not called again
+		return False
+
+	# Ensure that the song is first added
 	# so we can jump to it afterwards.
-	sleep(0.1)
-	utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
-	# start playing
-	utils.spawn_async((XMMS2, "play"))
+	glib.timeout_add(100, jump_and_play)
 
 def enqueue_songs(info, clear_queue=False):
 	songs = list(info)
@@ -119,18 +128,18 @@ class Previous (RunnableLeaf):
 	def get_icon_name(self):
 		return "media-skip-backward"
 
-# TODO: Implement nice song notifier using notify-send
-# class ShowPlaying (RunnableLeaf):
-# 	def __init__(self):
-# 		RunnableLeaf.__init__(self, name=_("Show Playing"))
-# 	def run(self):
-# 		utils.spawn_async((XMMS2, "--no-start", "--notify"))
-# 	def get_description(self):
-# 		return _("Tell which song is currently playing")
-# 	def get_gicon(self):
-# 		return icons.ComposedIcon("dialog-information", "audio-x-generic")
-# 	def get_icon_name(self):
-# 		return "dialog-information"
+class ShowPlaying (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Show Playing"))
+	def run(self):
+		song = get_current_song()
+		uiutils.show_notification(title=song["artist"], text=song["title"])
+	def get_description(self):
+		return _("Tell which song is currently playing")
+	def get_gicon(self):
+		return icons.ComposedIcon("dialog-information", "audio-x-generic")
+	def get_icon_name(self):
+		return "dialog-information"
 
 class ClearQueue (RunnableLeaf):
 	def __init__(self):
@@ -437,7 +446,7 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield Next()
 		yield Previous()
 		yield ClearQueue()
-		# yield ShowPlaying()
+		yield ShowPlaying()
 		artist_source = XMMS2ArtistsSource(artists)
 		album_source = XMMS2AlbumsSource(albums)
 		songs_source = XMMS2SongsSource(artists)
@@ -551,23 +560,28 @@ def parse_xmms2_artists(songs):
 	return artists
 
 def get_current_song():
-	"""Returns the current song's id"""
-	toolProc = subprocess.Popen([XMMS2, "list"],
-			stdout=subprocess.PIPE)
-	stdout, stderr = toolProc.communicate()
-	for line in stdout.splitlines():
+	"""Returns the current song as a dict"""
+	for line in _playlist_lines():
 		if line.startswith("->"):
-			# nyxmms2 list output format:
-			# ->[5/295] Lily Allen - I Could Say (04:05)
-			song_id = line[line.find("/") + 1:line.find("]")]
-			return int(song_id)
+			return _parse_line(line)
 
 def get_playlist_songs():
-	"""Yield tuples of (position, id) for playlist songs"""
-	toolProc = subprocess.Popen([XMMS2, "list"],
-			stdout=subprocess.PIPE)
+	"""Yield the IDs of all songs in the current playlist"""
+	for line in _playlist_lines():
+		if line.startswith("  [") or line.startswith("->["):
+			song = _parse_line(line)
+			yield song["id"]
+
+def _playlist_lines():
+	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
 	stdout, stderr = toolProc.communicate()
-	for line in stdout.splitlines():
-		pos = line[line.find("[") + 1:line.find("/") - 1]
-		song_id = line[line.find("/") + 1:line.find("]")]
-		yield (int(pos), int(song_id))
+	return stdout.splitlines()
+
+def _parse_line(line):
+	# nyxmms2 list output format:
+	# ->[5/295] Lily Allen - I Could Say (04:05)
+	song = {}
+	song["id"] = int(line[line.find("/") + 1:line.find("]")])
+	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
+	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
+	return song
