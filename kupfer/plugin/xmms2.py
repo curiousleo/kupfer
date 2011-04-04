@@ -327,8 +327,10 @@ class AlbumLeaf (TrackCollection):
 				if cover_data:
 					self.cover_data = cover_data
 
-		if   hasattr(self, "cover_file"): return icons.get_pixbuf_from_file(self.cover_file, width, height)
-		elif hasattr(self, "cover_data"): return icons.get_pixbuf_from_data(self.cover_data, width, height)
+		if hasattr(self, "cover_file"):
+			return icons.get_pixbuf_from_file(self.cover_file, width, height)
+		elif hasattr(self, "cover_data"):
+			return icons.get_pixbuf_from_data(self.cover_data, width, height)
 
 class ArtistAlbumsSource (CollectionSource):
 	def get_items(self):
