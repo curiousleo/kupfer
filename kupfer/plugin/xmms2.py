@@ -15,25 +15,24 @@ __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 # TODO: Add playlist support
 
 import itertools
-import gio
+import gio, glib
 import urllib
+import sqlite3
+import subprocess
 from os import path as os_path
+from contextlib import closing
 
 try:
-	from mutagen.mp3 import MP3
-	from mutagen.mp4 import MP4
+	import mutagen
 	_MUTAGEN = True
 except(ImportError):
 	_MUTAGEN = False
 
 from kupfer.objects import (Leaf, Source, AppLeaf, Action, RunnableLeaf,
 		SourceLeaf )
-from kupfer import objects, icons, utils, config
+from kupfer import objects, icons, utils, uiutils, config
 from kupfer.obj.apps import AppLeafContentMixin
 from kupfer import plugin_support
-from kupfer.plugin import xmms2_support
-
-from time import sleep # FIXME: Needed for ugly hack
 
 __kupfer_settings__ = plugin_support.PluginSettings(
 	{
@@ -57,16 +56,28 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 )
 
 XMMS2 = "nyxmms2"
+NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
 
 def play_song(info):
 	song_id = info["id"]
+	songs = list(get_playlist_songs())
+	# Don't add song if already in playlist
+	if song_id in songs:
+		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		return
+
 	utils.spawn_async((XMMS2, "add", "id:%s" % song_id))
-	# FIXME: Ugly hack that ensure that the song is first added
+
+	def jump_and_play():
+		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		# start playing
+		utils.spawn_async((XMMS2, "play"))
+		# must return False so it's not called again
+		return False
+
+	# Ensure that the song is first added
 	# so we can jump to it afterwards.
-	sleep(0.1)
-	utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
-	# start playing
-	utils.spawn_async((XMMS2, "play"))
+	glib.timeout_add(100, jump_and_play)
 
 def enqueue_songs(info, clear_queue=False):
 	songs = list(info)
@@ -118,18 +129,18 @@ class Previous (RunnableLeaf):
 	def get_icon_name(self):
 		return "media-skip-backward"
 
-# TODO: Implement nice song notifier using notify-send
-# class ShowPlaying (RunnableLeaf):
-# 	def __init__(self):
-# 		RunnableLeaf.__init__(self, name=_("Show Playing"))
-# 	def run(self):
-# 		utils.spawn_async((XMMS2, "--no-start", "--notify"))
-# 	def get_description(self):
-# 		return _("Tell which song is currently playing")
-# 	def get_gicon(self):
-# 		return icons.ComposedIcon("dialog-information", "audio-x-generic")
-# 	def get_icon_name(self):
-# 		return "dialog-information"
+class ShowPlaying (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Show Playing"))
+	def run(self):
+		song = get_current_song()
+		uiutils.show_notification(title=song["artist"], text=song["title"])
+	def get_description(self):
+		return _("Tell which song is currently playing")
+	def get_gicon(self):
+		return icons.ComposedIcon("dialog-information", "audio-x-generic")
+	def get_icon_name(self):
+		return "dialog-information"
 
 class ClearQueue (RunnableLeaf):
 	def __init__(self):
@@ -271,8 +282,9 @@ class AlbumLeaf (TrackCollection):
 		return _("by %s") % (artist, )
 
 	def _get_thumb_local(self):
-		# try local filesystem
-		fpath = self.object[0]["url"].replace("file://", "")
+		"Reads album art from image files in music folder."
+		# gio.File needs encoded filename
+		fpath = self.object[0]["url"].encode("utf-8")
 		gfile = gio.File(fpath)
 		cover_names = ("album.jpg", "cover.jpg", ".folder.jpg")
 		for cover_name in cover_names:
@@ -281,29 +293,28 @@ class AlbumLeaf (TrackCollection):
 				return cfile.get_path()
 
 	def _get_thumb_metadata(self):
-		# Using mutagen
-		# TODO: Add ogg vorbis, flac, ... 
+		"Reads album art from metadata."
 		pic = ""
-		fpath = self.object[0]["url"].replace("file://", "")
-		ext = os_path.splitext(fpath)[1][1:].lower()
-		if (ext == "m4a" or ext == "mp4" or ext == "aac"):
-			mp4info = MP4(fpath)
-			try:
-				pic = mp4info["covr"][0]
-			except(KeyError):
-				return None
-		elif ext == "mp3":
-			# add mime type differentiation
-			mp3info = MP3(fpath)
-			try:
-				pic = str(mp3info.tags.getall("APIC")[0].data)
-			except(IndexError):
-				return None
+		pics = []
 
-		if pic: return pic
+		# mutagen uses file() to read the tags
+		# file() can only read local files and uses path, not url
+		fpath = self.object[0]["url"].replace("file://", "")
+
+		finfo = mutagen.File(fpath)
+		if isinstance(finfo, mutagen.mp3.MP3):
+			pics = (apic.data for apic in finfo.tags.getall("APIC"))
+		elif isinstance(finfo, mutagen.mp4.MP4):
+			pics = finfo.tags.get("covr")
+		elif isinstance(finfo, mutagen.flac.FLAC):
+			pics = (apic.data for apic in finfo.pictures)
+
+		try:
+			pic = max(pics)
+			return pic
+		except(ValueError, TypeError): pass
 
 	def get_thumbnail(self, width, height):
-		# FIXME: This is ugly and does not work the way I expect
 		if not (hasattr(self, "cover_data") or hasattr(self, "cover_file")):
 			cover_file = self._get_thumb_local()
 			if cover_file:
@@ -313,8 +324,13 @@ class AlbumLeaf (TrackCollection):
 				if cover_data:
 					self.cover_data = cover_data
 
-		if   hasattr(self, "cover_file"): return icons.get_pixbuf_from_file(self.cover_file, width, height)
-		elif hasattr(self, "cover_data"): return icons.get_pixbuf_from_data(self.cover_data, width, height)
+		try:
+			if hasattr(self, "cover_file"):
+				return icons.get_pixbuf_from_file(self.cover_file, width, height)
+			elif hasattr(self, "cover_data"):
+				return icons.get_pixbuf_from_data(self.cover_data, width, height)
+		except(glib.GError):
+			pass
 
 class ArtistAlbumsSource (CollectionSource):
 	def get_items(self):
@@ -423,20 +439,20 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		Source.__init__(self, _("XMMS2"))
 	def get_items(self):
 		try:
-			dbfile = xmms2_support.get_xmms2_dbfile()
-			if dbfile: songs = list(xmms2_support.get_xmms2_songs(dbfile))
+			dbfile = config.get_config_file("medialib.db", package="xmms2")
+			songs = list(get_xmms2_songs(dbfile))
 		except StandardError, e:
 			self.output_error(e)
 			songs = []
 
-		albums = xmms2_support.parse_xmms2_albums(songs)
-		artists = xmms2_support.parse_xmms2_artists(songs)
+		albums = parse_xmms2_albums(songs)
+		artists = parse_xmms2_artists(songs)
 		yield Play()
 		yield Pause()
 		yield Next()
 		yield Previous()
 		yield ClearQueue()
-		# yield ShowPlaying()
+		yield ShowPlaying()
 		artist_source = XMMS2ArtistsSource(artists)
 		album_source = XMMS2AlbumsSource(albums)
 		songs_source = XMMS2SongsSource(artists)
@@ -462,3 +478,104 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield RunnableLeaf
 		yield SourceLeaf
 		yield SongLeaf
+
+def get_xmms2_songs(dbfile):
+	"""Get songs from xmms2 media library (sqlite). Generator function."""
+	def _unicode_url(rawurl):
+		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
+
+	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
+		cu = db.execute("""
+				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
+				FROM   Media A,          Media B,           Media C,          Media D,            Media E
+				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
+				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
+		""")
+
+		for row in cu:
+			# NEEDED_KEYS and returned rows must have the same order for this to work
+			song = dict(zip((NEEDED_KEYS), row))
+			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
+			song["url"] = _unicode_url(song["url"])
+			# Generator
+			yield song
+
+def sort_album(album):
+	"""Sort album in track order"""
+	def get_track_number(rec):
+		try:
+			tnr = int(rec["tracknr"])
+		except (KeyError, ValueError):
+			tnr = 0
+		return tnr
+	album.sort(key=get_track_number)
+
+def sort_album_order(songs):
+	"""Sort songs in order by album then by track number"""
+	pass
+
+	def get_album_order(rec):
+		try:
+			tnr = int(rec["tracknr"])
+		except (KeyError, ValueError):
+			tnr = 0
+		return (rec["album"], tnr)
+	songs.sort(key=get_album_order)
+
+def parse_xmms2_albums(songs):
+	albums = {}
+	for song in songs:
+		song_artist = song["artist"]
+		if not song_artist:
+			continue
+		song_album = song["album"]
+		if not song_album:
+			continue
+		album = albums.get(song_album, [])
+		album.append(song)
+		albums[song_album] = album
+	# sort album in track order
+	for album in albums:
+		sort_album(albums[album])
+	return albums
+
+def parse_xmms2_artists(songs):
+	artists = {}
+	for song in songs:
+		song_artist = song["artist"]
+		if not song_artist:
+			continue
+		artist = artists.get(song_artist, [])
+		artist.append(song)
+		artists[song_artist] = artist
+	# sort in album + track order
+	for artist in artists:
+		sort_album_order(artists[artist])
+	return artists
+
+def get_current_song():
+	"""Returns the current song as a dict"""
+	for line in _playlist_lines():
+		if line.startswith("->"):
+			return _parse_line(line)
+
+def get_playlist_songs():
+	"""Yield the IDs of all songs in the current playlist"""
+	for line in _playlist_lines():
+		if line.startswith("  [") or line.startswith("->["):
+			song = _parse_line(line)
+			yield song["id"]
+
+def _playlist_lines():
+	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
+	stdout, stderr = toolProc.communicate()
+	return stdout.splitlines()
+
+def _parse_line(line):
+	# nyxmms2 list output format:
+	# ->[5/295] Lily Allen - I Could Say (04:05)
+	song = {}
+	song["id"] = int(line[line.find("/") + 1:line.find("]")])
+	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
+	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
+	return song
