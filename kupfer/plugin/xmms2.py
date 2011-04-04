@@ -283,8 +283,8 @@ class AlbumLeaf (TrackCollection):
 		return _("by %s") % (artist, )
 
 	def _get_thumb_local(self):
-		# try local filesystem
-		fpath = self.object[0]["url"].replace("file://", "")
+		# gio.File needs encoded filename
+		fpath = self.object[0]["url"].encode("utf-8")
 		gfile = gio.File(fpath)
 		cover_names = ("album.jpg", "cover.jpg", ".folder.jpg")
 		for cover_name in cover_names:
@@ -296,6 +296,8 @@ class AlbumLeaf (TrackCollection):
 		# Using mutagen
 		# TODO: Add ogg vorbis, flac, ... 
 		pic = ""
+		# mutagen uses file() to read the tags
+		# file() can only read local files and uses path, not url
 		fpath = self.object[0]["url"].replace("file://", "")
 		ext = os_path.splitext(fpath)[1][1:].lower()
 		if (ext == "m4a" or ext == "mp4" or ext == "aac"):
@@ -477,7 +479,7 @@ class XMMS2Source (AppLeafContentMixin, Source):
 
 def get_xmms2_songs(dbfile):
 	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	def _tourl(rawurl):
+	def _unicode_url(rawurl):
 		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
 	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
@@ -492,7 +494,7 @@ def get_xmms2_songs(dbfile):
 			# NEEDED_KEYS and returned rows must have the same order for this to work
 			song = dict(zip((NEEDED_KEYS), row))
 			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
-			song["url"] = _tourl(song["url"])
+			song["url"] = _unicode_url(song["url"])
 			# Generator
 			yield song
 
