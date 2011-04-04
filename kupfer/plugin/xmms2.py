@@ -25,6 +25,7 @@ from contextlib import closing
 try:
 	from mutagen.mp3 import MP3
 	from mutagen.mp4 import MP4
+	from mutagen.flac import FLAC
 	_MUTAGEN = True
 except(ImportError):
 	_MUTAGEN = False
@@ -294,30 +295,50 @@ class AlbumLeaf (TrackCollection):
 
 	def _get_thumb_metadata(self):
 		# Using mutagen
-		# TODO: Add ogg vorbis, flac, ... 
 		pic = ""
 		# mutagen uses file() to read the tags
 		# file() can only read local files and uses path, not url
 		fpath = self.object[0]["url"].replace("file://", "")
 		ext = os_path.splitext(fpath)[1][1:].lower()
-		if (ext == "m4a" or ext == "mp4" or ext == "aac"):
-			mp4info = MP4(fpath)
-			try:
-				pic = mp4info["covr"][0]
-			except(KeyError):
-				return None
-		elif ext == "mp3":
-			# add mime type differentiation
+
+		# TODO: Use mutagen.File?
+
+		def _mp3_pic(fpath):
 			mp3info = MP3(fpath)
 			try:
 				pic = str(mp3info.tags.getall("APIC")[0].data)
+				return pic
 			except(IndexError):
 				return None
+
+		def _mp4_pic(fpath):
+			mp4info = MP4(fpath)
+			try:
+				pic = mp4info["covr"][0]
+				return pic
+			except(KeyError):
+				return None
+
+		def _flac_pic(fpath):
+			flacinfo = FLAC(fpath)
+			try:
+				pic = flacinfo.pictures[0].data
+				return pic
+			except(IndexError):
+				return None
+
+		pic_decoder = {
+				"mp3": _mp3_pic,
+				"mp4": _mp4_pic, "m4a": _mp4_pic, "aac": _mp4_pic,
+				"flac": _flac_pic, "fla": _flac_pic,
+				# "ogg": _oggvorbis_pic
+				}
+		
+		pic = pic_decoder[ext](fpath)
 
 		if pic: return pic
 
 	def get_thumbnail(self, width, height):
-		# FIXME: This is ugly and does not work the way I expect
 		if not (hasattr(self, "cover_data") or hasattr(self, "cover_file")):
 			cover_file = self._get_thumb_local()
 			if cover_file:
