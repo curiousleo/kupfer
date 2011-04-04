@@ -9,6 +9,7 @@ The unescaping we are doing is only one way.. so we unescape according to the
 rules, but we accept everything, if validly quoted or not.
 """
 
+import warnings
 
 # This is the "string" type encoding escapes
 # this is unescaped before we process anything..
@@ -70,6 +71,9 @@ def quote_scanner(s, reptable):
 	eqstr = '\\' + qstr
 
 	parts = []  # A list of arguments
+	preceding_space = False
+	# true if quoted arg is sticky on previous arg
+	should_join_arg = False
 
 	if not s:
 		return parts
@@ -78,9 +82,23 @@ def quote_scanner(s, reptable):
 		_ps = "".join(part)
 		if is_quoted:
 			parts.append(two_part_unescaper(rmquotes(_ps), reptable))
+		elif '\\' in _ps:
+			## Here we handle out-of-spec things
+			warnings.warn(RuntimeWarning("Broken unquoted Exec= %s" % repr(s)))
+			## try to split by whitespace, ignore backslash-escaped spaces
+			## insert NUL instead of '\ ' and then split, then reverse
+			space_escaped = two_part_unescaper(_ps, {r'\ ': '\x00'})
+			space_esc_split = space_escaped.split()
+			ps_split = [x.replace('\x00', ' ') for x in space_esc_split]
+			parts.extend([two_part_unescaper(_ps_part, reptable) for _ps_part
+			              in ps_split])
+			## end out-of spec
 		else:
 			parts.extend(_ps.split())
 
+	def merge_last_parts():
+		"merge last two argv parts into one"
+		parts[:] = parts[:-2] + ["".join(parts[-2:])]
 
 	is_quoted = False
 	it = iter(zip(s, s[1:]))
@@ -97,6 +115,8 @@ def quote_scanner(s, reptable):
 		elif cur == qstr:
 			if is_quoted:
 				add_part(is_quoted, part)
+				if should_join_arg:
+					merge_last_parts()
 				part = []
 				is_quoted = not is_quoted
 			else:
@@ -105,8 +125,12 @@ def quote_scanner(s, reptable):
 					add_part(is_quoted, head)
 					part = [part[-1]]
 				is_quoted = not is_quoted
+				## if a quoted string begins without preceding whitespace
+				## we must sticky it on the preceding arg
+				should_join_arg = not preceding_space
 		else:
 			pass
+		preceding_space = cur.isspace()
 	else:
 		# This is a for-else: we did not 'break'
 		# Emit the last if it wasn't already
@@ -147,7 +171,26 @@ def test_unquote_inside():
 	pass
 
 def parse_argv(instr):
-	"Parse quoted @instr into an argv"
+	r"""
+	Parse quoted @instr into an argv
+
+	>>> parse_argv('env "VAR=is good" ./program')
+	['env', 'VAR=is good', './program']
+	>>> parse_argv('env "VAR=\\\\ \\$ @ x" ./program')
+	['env', 'VAR=\\ $ @ x', './program']
+
+	The following style is common but unspecified
+	>>> parse_argv('env VAR="is broken" ./program')
+	['env', 'VAR=is broken', './program']
+
+	The following is just completely broken
+	>>> parse_argv('./program unquoted\\\\argument')
+	['./program', 'unquoted\\argument']
+
+	The following is just completely broken
+	>>> parse_argv('./program No\\ Space')
+	['./program', 'No Space']
+	"""
 	return quote_scanner(instr, quoted_table)
 
 def parse_unesc_argv(instr):
