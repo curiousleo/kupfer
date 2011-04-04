@@ -508,17 +508,7 @@ def sort_album(album):
 	album.sort(key=get_track_number)
 
 def sort_album_order(songs):
-	"""Sort songs in order by album then by track number
-
-	>>> songs = [
-	... {"title": "a", "album": "B", "tracknr": "2"},
-	... {"title": "b", "album": "A", "tracknr": "1"},
-	... {"title": "c", "album": "B", "tracknr": "1"},
-	... ]
-	>>> sort_album_order(songs)
-	>>> [s["title"] for s in songs]
-	['b', 'c', 'a']
-	"""
+	"""Sort songs in order by album then by track number"""
 	pass
 
 	def get_album_order(rec):
@@ -581,7 +571,3 @@ def get_playlist_songs():
 		pos = line[line.find("[") + 1:line.find("/") - 1]
 		song_id = line[line.find("/") + 1:line.find("]")]
 		yield (int(pos), int(song_id))
-
-if __name__ == '__main__':
-	import doctest
-	doctest.testmod()
