@@ -435,8 +435,8 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		Source.__init__(self, _("XMMS2"))
 	def get_items(self):
 		try:
-			dbfile = get_xmms2_dbfile()
-			if dbfile: songs = list(get_xmms2_songs(dbfile))
+			dbfile = config.get_config_file("medialib.db", package="xmms2")
+			songs = list(get_xmms2_songs(dbfile))
 		except StandardError, e:
 			self.output_error(e)
 			songs = []
@@ -474,12 +474,6 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield RunnableLeaf
 		yield SourceLeaf
 		yield SongLeaf
-
-def get_xmms2_dbfile():
-	"""Returns default path of xmms2 media library if it exists"""
-	dbfile = os_path.expanduser("~/.config/xmms2/medialib.db")
-	if os_path.exists(dbfile):
-		return dbfile
 
 def get_xmms2_songs(dbfile):
 	"""Get songs from xmms2 media library (sqlite). Generator function."""
