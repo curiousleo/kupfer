@@ -18,6 +18,7 @@ import itertools
 import gio
 import urllib
 import sqlite3
+import subprocess
 from os import path as os_path
 
 try:
@@ -29,7 +30,7 @@ except(ImportError):
 
 from kupfer.objects import (Leaf, Source, AppLeaf, Action, RunnableLeaf,
 		SourceLeaf )
-from kupfer import objects, icons, utils, config
+from kupfer import objects, icons, utils, uiutils, config
 from kupfer.obj.apps import AppLeafContentMixin
 from kupfer import plugin_support
 
@@ -558,6 +559,28 @@ def parse_xmms2_artists(songs):
 	for artist in artists:
 		sort_album_order(artists[artist])
 	return artists
+
+def get_current_song():
+	"""Returns the current song's id"""
+	toolProc = subprocess.Popen([XMMS2, "list"],
+			stdout=subprocess.PIPE)
+	stdout, stderr = toolProc.communicate()
+	for line in stdout.splitlines():
+		if line.startswith("->"):
+			# nyxmms2 list output format:
+			# ->[5/295] Lily Allen - I Could Say (04:05)
+			song_id = line[line.find("/") + 1:line.find("]")]
+			return int(song_id)
+
+def get_playlist_songs():
+	"""Yield tuples of (position, id) for playlist songs"""
+	toolProc = subprocess.Popen([XMMS2, "list"],
+			stdout=subprocess.PIPE)
+	stdout, stderr = toolProc.communicate()
+	for line in stdout.splitlines():
+		pos = line[line.find("[") + 1:line.find("/") - 1]
+		song_id = line[line.find("/") + 1:line.find("]")]
+		yield (int(pos), int(song_id))
 
 if __name__ == '__main__':
 	import doctest
