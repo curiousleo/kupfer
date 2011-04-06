@@ -61,9 +61,6 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 
 def get_xmms2_songs(dbfile):
 	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	def _unicode_url(rawurl):
-		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
-
 	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
 		cu = db.execute("""
 				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
@@ -79,6 +76,9 @@ def get_xmms2_songs(dbfile):
 			song["url"] = _unicode_url(song["url"])
 			# Generator
 			yield song
+
+def _unicode_url(rawurl):
+	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
 def get_current_song():
 	"""Returns the current song as a dict"""
@@ -111,7 +111,8 @@ def play_song(info):
 	song_id = info["id"]
 	songs = list(get_playlist_songs())
 	if song_id in songs:
-		utils.spawn_async((XMMS2, "jump", "%d" % songs.index(song_id) + 1))
+		utils.spawn_async((XMMS2, "jump", "%d" % (songs.index(song_id) + 1)))
+		utils.spawn_async((XMMS2, "play"))
 		return
 
 	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
