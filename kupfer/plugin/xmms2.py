@@ -110,23 +110,19 @@ def _parse_line(line):
 def play_song(info):
 	song_id = info["id"]
 	songs = list(get_playlist_songs())
-	# Don't add song if already in playlist
 	if song_id in songs:
-		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		utils.spawn_async((XMMS2, "jump", "%d" % songs.index(song_id) + 1))
 		return
 
-	utils.spawn_async((XMMS2, "add", "id:%s" % song_id))
+	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
+	# Ensure that the song is first added so we can jump to it afterwards.
+	glib.timeout_add(100, _jump_and_play, song_id)
 
-	def jump_and_play():
-		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
-		# start playing
-		utils.spawn_async((XMMS2, "play"))
-		# must return False so it's not called again
-		return False
-
-	# Ensure that the song is first added
-	# so we can jump to it afterwards.
-	glib.timeout_add(100, jump_and_play)
+def _jump_and_play(song_id):
+	utils.spawn_async((XMMS2, "jump", "id:%d" % song_id))
+	utils.spawn_async((XMMS2, "play"))
+	# must return False so it's not called again
+	return False
 
 def enqueue_songs(info, clear_queue=False):
 	songs = list(info)
