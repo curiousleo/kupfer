@@ -11,7 +11,6 @@ __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 # This implementation depends on the command-line tool "nyxmms2",
 # which should come with XMMS2 by default.
 
-# TODO: Add shuffle settings
 # TODO: Add playlist support
 
 import itertools
@@ -206,6 +205,16 @@ class ToggleRepeat (RunnableLeaf):
 	def get_icon_name(self):
 		# FIXME: This is not the correct icon
 		return "edit-undo"
+
+class Shuffle (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Shuffle"))
+	def run(self):
+		utils.spawn_async(([XMMS2] + "playlist shuffle".split(" ")))
+	def get_description(self):
+		return _("Shuffle playlist in XMMS2")
+	# def get_icon_name(self):
+		# FIXME: Find correct icon
 
 def _songs_from_leaf(leaf):
 	"return a sequence of songs from @leaf"
@@ -509,8 +518,9 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield Next()
 		yield Previous()
 		yield ClearQueue()
-		yield ShowPlaying()
 		yield ToggleRepeat()
+		yield Shuffle()
+		yield ShowPlaying()
 		artist_source = XMMS2ArtistsSource(artists)
 		album_source = XMMS2AlbumsSource(albums)
 		songs_source = XMMS2SongsSource(artists)
