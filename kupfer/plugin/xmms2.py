@@ -3,7 +3,7 @@
 __kupfer_name__ = _("XMMS2")
 __kupfer_sources__ = ("XMMS2Source", )
 __description__ = _("Play and enqueue tracks and browse the music library")
-__version__ = "2011-04-01"
+__version__ = ""
 __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 
 # This code is heavily based on Ulrik Sverdrup's Rhythmbox Plugin
@@ -33,6 +33,10 @@ from kupfer.objects import (Leaf, Source, AppLeaf, Action, RunnableLeaf,
 from kupfer import objects, icons, utils, uiutils, config
 from kupfer.obj.apps import AppLeafContentMixin
 from kupfer import plugin_support
+from kupfer.plugin import rhythmbox_support
+
+XMMS2 = "nyxmms2"
+NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
 
 __kupfer_settings__ = plugin_support.PluginSettings(
 	{
@@ -54,9 +58,6 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 		"value": False,
 	},
 )
-
-XMMS2 = "nyxmms2"
-NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
 
 def play_song(info):
 	song_id = info["id"]
@@ -445,8 +446,8 @@ class XMMS2Source (AppLeafContentMixin, Source):
 			self.output_error(e)
 			songs = []
 
-		albums = parse_xmms2_albums(songs)
-		artists = parse_xmms2_artists(songs)
+		albums = rhythmbox_support.parse_rhythmbox_albums(songs)
+		artists = rhythmbox_support.parse_rhythmbox_artists(songs)
 		yield Play()
 		yield Pause()
 		yield Next()
@@ -499,59 +500,6 @@ def get_xmms2_songs(dbfile):
 			song["url"] = _unicode_url(song["url"])
 			# Generator
 			yield song
-
-def sort_album(album):
-	"""Sort album in track order"""
-	def get_track_number(rec):
-		try:
-			tnr = int(rec["tracknr"])
-		except (KeyError, ValueError):
-			tnr = 0
-		return tnr
-	album.sort(key=get_track_number)
-
-def sort_album_order(songs):
-	"""Sort songs in order by album then by track number"""
-	pass
-
-	def get_album_order(rec):
-		try:
-			tnr = int(rec["tracknr"])
-		except (KeyError, ValueError):
-			tnr = 0
-		return (rec["album"], tnr)
-	songs.sort(key=get_album_order)
-
-def parse_xmms2_albums(songs):
-	albums = {}
-	for song in songs:
-		song_artist = song["artist"]
-		if not song_artist:
-			continue
-		song_album = song["album"]
-		if not song_album:
-			continue
-		album = albums.get(song_album, [])
-		album.append(song)
-		albums[song_album] = album
-	# sort album in track order
-	for album in albums:
-		sort_album(albums[album])
-	return albums
-
-def parse_xmms2_artists(songs):
-	artists = {}
-	for song in songs:
-		song_artist = song["artist"]
-		if not song_artist:
-			continue
-		artist = artists.get(song_artist, [])
-		artist.append(song)
-		artists[song_artist] = artist
-	# sort in album + track order
-	for artist in artists:
-		sort_album_order(artists[artist])
-	return artists
 
 def get_current_song():
 	"""Returns the current song as a dict"""
