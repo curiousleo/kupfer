@@ -109,11 +109,8 @@ def _parse_line(line):
 
 def play_song(info):
 	song_id = info["id"]
-	songs = list(get_playlist_songs())
-	if song_id in songs:
-		utils.spawn_async((XMMS2, "jump", "%d" % (songs.index(song_id) + 1)))
-		utils.spawn_async((XMMS2, "play"))
-		return
+	if song_id in get_playlist_songs():
+		_jump_and_play(song_id); return
 
 	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
 	# Ensure that the song is first added so we can jump to it afterwards.
