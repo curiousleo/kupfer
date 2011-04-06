@@ -11,7 +11,7 @@ __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 # This implementation depends on the command-line tool "nyxmms2",
 # which should come with XMMS2 by default.
 
-# TODO: Add shuffle, repeat settings
+# TODO: Add shuffle settings
 # TODO: Add playlist support
 
 import itertools
