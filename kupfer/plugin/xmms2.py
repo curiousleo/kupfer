@@ -11,7 +11,6 @@ __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 # This implementation depends on the command-line tool "nyxmms2",
 # which should come with XMMS2 by default.
 
-# TODO: Add shuffle, repeat settings
 # TODO: Add playlist support
 
 import itertools
@@ -61,9 +60,6 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 
 def get_xmms2_songs(dbfile):
 	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	def _unicode_url(rawurl):
-		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
-
 	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
 		cu = db.execute("""
 				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
@@ -80,21 +76,24 @@ def get_xmms2_songs(dbfile):
 			# Generator
 			yield song
 
+def _unicode_url(rawurl):
+	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
+
 def get_current_song():
 	"""Returns the current song as a dict"""
-	for line in _playlist_lines():
+	for line in _cmd_output(["list"]):
 		if line.startswith("->"):
 			return _parse_line(line)
 
 def get_playlist_songs():
 	"""Yield the IDs of all songs in the current playlist"""
-	for line in _playlist_lines():
+	for line in _cmd_output(["list"]):
 		if line.startswith("  [") or line.startswith("->["):
 			song = _parse_line(line)
 			yield song["id"]
 
-def _playlist_lines():
-	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
+def _cmd_output(args):
+	toolProc = subprocess.Popen([XMMS2] + args, stdout=subprocess.PIPE)
 	stdout, stderr = toolProc.communicate()
 	return stdout.splitlines()
 
@@ -109,10 +108,8 @@ def _parse_line(line):
 
 def play_song(info):
 	song_id = info["id"]
-	songs = list(get_playlist_songs())
-	if song_id in songs:
-		utils.spawn_async((XMMS2, "jump", "%d" % songs.index(song_id) + 1))
-		return
+	if song_id in get_playlist_songs():
+		_jump_and_play(song_id); return
 
 	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
 	# Ensure that the song is first added so we can jump to it afterwards.
@@ -194,6 +191,30 @@ class ClearQueue (RunnableLeaf):
 		utils.spawn_async((XMMS2, "playlist", "clear"))
 	def get_icon_name(self):
 		return "edit-clear"
+
+class ToggleRepeat (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Repeat"))
+	def run(self):
+		toggle = int(
+			_cmd_output("server config playlist.repeat_all".split(" "))[0][-1])
+		toggle = (toggle + 1) % 2
+		utils.spawn_async(([XMMS2] + ("server config playlist.repeat_all %d" % toggle).split(" ")))
+	def get_description(self):
+		return _("Toggle repeat playlist in XMMS2")
+	def get_icon_name(self):
+		# FIXME: This is not the correct icon
+		return "edit-undo"
+
+class Shuffle (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Shuffle"))
+	def run(self):
+		utils.spawn_async(([XMMS2] + "playlist shuffle".split(" ")))
+	def get_description(self):
+		return _("Shuffle playlist in XMMS2")
+	# def get_icon_name(self):
+		# FIXME: Find correct icon
 
 def _songs_from_leaf(leaf):
 	"return a sequence of songs from @leaf"
@@ -497,6 +518,8 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield Next()
 		yield Previous()
 		yield ClearQueue()
+		yield ToggleRepeat()
+		yield Shuffle()
 		yield ShowPlaying()
 		artist_source = XMMS2ArtistsSource(artists)
 		album_source = XMMS2AlbumsSource(albums)
