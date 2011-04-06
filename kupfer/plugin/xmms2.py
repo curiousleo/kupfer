@@ -59,6 +59,54 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 	},
 )
 
+def get_xmms2_songs(dbfile):
+	"""Get songs from xmms2 media library (sqlite). Generator function."""
+	def _unicode_url(rawurl):
+		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
+
+	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
+		cu = db.execute("""
+				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
+				FROM   Media A,          Media B,           Media C,          Media D,            Media E
+				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
+				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
+		""")
+
+		for row in cu:
+			# NEEDED_KEYS and returned rows must have the same order for this to work
+			song = dict(zip((NEEDED_KEYS), row))
+			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
+			song["url"] = _unicode_url(song["url"])
+			# Generator
+			yield song
+
+def get_current_song():
+	"""Returns the current song as a dict"""
+	for line in _playlist_lines():
+		if line.startswith("->"):
+			return _parse_line(line)
+
+def get_playlist_songs():
+	"""Yield the IDs of all songs in the current playlist"""
+	for line in _playlist_lines():
+		if line.startswith("  [") or line.startswith("->["):
+			song = _parse_line(line)
+			yield song["id"]
+
+def _playlist_lines():
+	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
+	stdout, stderr = toolProc.communicate()
+	return stdout.splitlines()
+
+def _parse_line(line):
+	# nyxmms2 list output format:
+	# ->[5/295] Lily Allen - I Could Say (04:05)
+	song = {}
+	song["id"] = int(line[line.find("/") + 1:line.find("]")])
+	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
+	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
+	return song
+
 def play_song(info):
 	song_id = info["id"]
 	songs = list(get_playlist_songs())
@@ -480,50 +528,3 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield SourceLeaf
 		yield SongLeaf
 
-def get_xmms2_songs(dbfile):
-	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	def _unicode_url(rawurl):
-		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
-
-	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
-		cu = db.execute("""
-				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
-				FROM   Media A,          Media B,           Media C,          Media D,            Media E
-				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
-				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
-		""")
-
-		for row in cu:
-			# NEEDED_KEYS and returned rows must have the same order for this to work
-			song = dict(zip((NEEDED_KEYS), row))
-			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
-			song["url"] = _unicode_url(song["url"])
-			# Generator
-			yield song
-
-def get_current_song():
-	"""Returns the current song as a dict"""
-	for line in _playlist_lines():
-		if line.startswith("->"):
-			return _parse_line(line)
-
-def get_playlist_songs():
-	"""Yield the IDs of all songs in the current playlist"""
-	for line in _playlist_lines():
-		if line.startswith("  [") or line.startswith("->["):
-			song = _parse_line(line)
-			yield song["id"]
-
-def _playlist_lines():
-	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
-	stdout, stderr = toolProc.communicate()
-	return stdout.splitlines()
-
-def _parse_line(line):
-	# nyxmms2 list output format:
-	# ->[5/295] Lily Allen - I Could Say (04:05)
-	song = {}
-	song["id"] = int(line[line.find("/") + 1:line.find("]")])
-	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
-	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
-	return song
