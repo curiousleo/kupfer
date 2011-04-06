@@ -82,19 +82,19 @@ def _unicode_url(rawurl):
 
 def get_current_song():
 	"""Returns the current song as a dict"""
-	for line in _playlist_lines():
+	for line in _cmd_output(["list"]):
 		if line.startswith("->"):
 			return _parse_line(line)
 
 def get_playlist_songs():
 	"""Yield the IDs of all songs in the current playlist"""
-	for line in _playlist_lines():
+	for line in _cmd_output(["list"]):
 		if line.startswith("  [") or line.startswith("->["):
 			song = _parse_line(line)
 			yield song["id"]
 
-def _playlist_lines():
-	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
+def _cmd_output(args):
+	toolProc = subprocess.Popen([XMMS2] + args, stdout=subprocess.PIPE)
 	stdout, stderr = toolProc.communicate()
 	return stdout.splitlines()
 
@@ -192,6 +192,20 @@ class ClearQueue (RunnableLeaf):
 		utils.spawn_async((XMMS2, "playlist", "clear"))
 	def get_icon_name(self):
 		return "edit-clear"
+
+class ToggleRepeat (RunnableLeaf):
+	def __init__(self):
+		RunnableLeaf.__init__(self, name=_("Repeat"))
+	def run(self):
+		toggle = int(
+			_cmd_output("server config playlist.repeat_all".split(" "))[0][-1])
+		toggle = (toggle + 1) % 2
+		utils.spawn_async(([XMMS2] + ("server config playlist.repeat_all %d" % toggle).split(" ")))
+	def get_description(self):
+		return _("Toggle repeat playlist in XMMS2")
+	def get_icon_name(self):
+		# FIXME: This is not the correct icon
+		return "edit-undo"
 
 def _songs_from_leaf(leaf):
 	"return a sequence of songs from @leaf"
@@ -496,6 +510,7 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield Previous()
 		yield ClearQueue()
 		yield ShowPlaying()
+		yield ToggleRepeat()
 		artist_source = XMMS2ArtistsSource(artists)
 		album_source = XMMS2AlbumsSource(albums)
 		songs_source = XMMS2SongsSource(artists)
