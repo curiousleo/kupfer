@@ -71,12 +71,19 @@ def get_xmms2_songs(dbfile):
 		for row in cu:
 			# NEEDED_KEYS and returned rows must have the same order for this to work
 			song = dict(zip((NEEDED_KEYS), row))
-			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
 			song["url"] = _unicode_url(song["url"])
 			# Generator
 			yield song
 
 def _unicode_url(rawurl):
+	"""Converts latin-1 encoded string from xmms2 medialib
+	to unicode
+
+	>>> _unicode_url(
+	...		u"file:///home/Music/B%c3%a9nabar+%282001%29+B%c3%a9nabar/08+Coup+du+lapin.m4a")
+	u'file:///home/Music/B\\xe9nabar (2001) B\\xe9nabar/08 Coup du lapin.m4a'
+	"""
+
 	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
 def get_current_song():
@@ -98,8 +105,12 @@ def _cmd_output(args):
 	return stdout.splitlines()
 
 def _parse_line(line):
-	# nyxmms2 list output format:
-	# ->[5/295] Lily Allen - I Could Say (04:05)
+	"""Parses nyxmms2 output line by line.
+
+	>>> testme = _parse_line("->[5/295] Lily Allen - I Could Say (04:05)").items(); \
+			testme.sort(); testme
+	[('artist', 'Lily Allen'), ('id', 295), ('title', 'I Could Say')]
+	"""
 	song = {}
 	song["id"] = int(line[line.find("/") + 1:line.find("]")])
 	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
@@ -547,3 +558,6 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield SourceLeaf
 		yield SongLeaf
 
+if __name__ == '__main__':
+	import doctest
+	doctest.testmod()
