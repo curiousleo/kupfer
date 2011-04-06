@@ -33,6 +33,10 @@ from kupfer.objects import (Leaf, Source, AppLeaf, Action, RunnableLeaf,
 from kupfer import objects, icons, utils, uiutils, config
 from kupfer.obj.apps import AppLeafContentMixin
 from kupfer import plugin_support
+from kupfer.plugin import rhythmbox_support
+
+XMMS2 = "nyxmms2"
+NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
 
 __kupfer_settings__ = plugin_support.PluginSettings(
 	{
@@ -55,29 +59,70 @@ __kupfer_settings__ = plugin_support.PluginSettings(
 	},
 )
 
-XMMS2 = "nyxmms2"
-NEEDED_KEYS= ("id", "title", "artist", "album", "tracknr", "url")
+def get_xmms2_songs(dbfile):
+	"""Get songs from xmms2 media library (sqlite). Generator function."""
+	def _unicode_url(rawurl):
+		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
+
+	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
+		cu = db.execute("""
+				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
+				FROM   Media A,          Media B,           Media C,          Media D,            Media E
+				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
+				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
+		""")
+
+		for row in cu:
+			# NEEDED_KEYS and returned rows must have the same order for this to work
+			song = dict(zip((NEEDED_KEYS), row))
+			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
+			song["url"] = _unicode_url(song["url"])
+			# Generator
+			yield song
+
+def get_current_song():
+	"""Returns the current song as a dict"""
+	for line in _playlist_lines():
+		if line.startswith("->"):
+			return _parse_line(line)
+
+def get_playlist_songs():
+	"""Yield the IDs of all songs in the current playlist"""
+	for line in _playlist_lines():
+		if line.startswith("  [") or line.startswith("->["):
+			song = _parse_line(line)
+			yield song["id"]
+
+def _playlist_lines():
+	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
+	stdout, stderr = toolProc.communicate()
+	return stdout.splitlines()
+
+def _parse_line(line):
+	# nyxmms2 list output format:
+	# ->[5/295] Lily Allen - I Could Say (04:05)
+	song = {}
+	song["id"] = int(line[line.find("/") + 1:line.find("]")])
+	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
+	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
+	return song
 
 def play_song(info):
 	song_id = info["id"]
 	songs = list(get_playlist_songs())
-	# Don't add song if already in playlist
 	if song_id in songs:
-		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
+		utils.spawn_async((XMMS2, "jump", "%d" % songs.index(song_id) + 1))
 		return
 
-	utils.spawn_async((XMMS2, "add", "id:%s" % song_id))
+	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
+	# Ensure that the song is first added so we can jump to it afterwards.
+	glib.timeout_add(100, _jump_and_play, song_id)
 
-	def jump_and_play():
-		utils.spawn_async((XMMS2, "jump", "id:%s" % song_id))
-		# start playing
-		utils.spawn_async((XMMS2, "play"))
-		# must return False so it's not called again
-		return False
-
-	# Ensure that the song is first added
-	# so we can jump to it afterwards.
-	glib.timeout_add(100, jump_and_play)
+def _jump_and_play(song_id):
+	utils.spawn_async((XMMS2, "jump", "id:%d" % song_id))
+	utils.spawn_async((XMMS2, "play"))
+	# must return False so it's not called again
+	return False
 
 def enqueue_songs(info, clear_queue=False):
 	songs = list(info)
@@ -445,8 +490,8 @@ class XMMS2Source (AppLeafContentMixin, Source):
 			self.output_error(e)
 			songs = []
 
-		albums = parse_xmms2_albums(songs)
-		artists = parse_xmms2_artists(songs)
+		albums = rhythmbox_support.parse_rhythmbox_albums(songs)
+		artists = rhythmbox_support.parse_rhythmbox_artists(songs)
 		yield Play()
 		yield Pause()
 		yield Next()
@@ -479,103 +524,3 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield SourceLeaf
 		yield SongLeaf
 
-def get_xmms2_songs(dbfile):
-	"""Get songs from xmms2 media library (sqlite). Generator function."""
-	def _unicode_url(rawurl):
-		return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
-
-	with closing(sqlite3.connect(dbfile, timeout=2)) as db:
-		cu = db.execute("""
-				SELECT A.id, A.value,    B.value,           C.value,          D.value,            E.value
-				FROM   Media A,          Media B,           Media C,          Media D,            Media E
-				WHERE  A.key="title" AND B.key="artist" AND C.key="album" AND D.key="tracknr" AND E.key="url"
-				AND    A.id = B.id AND B.id = C.id AND C.id = D.id AND D.id = E.id
-		""")
-
-		for row in cu:
-			# NEEDED_KEYS and returned rows must have the same order for this to work
-			song = dict(zip((NEEDED_KEYS), row))
-			# URLs are saved in quoted format in the db; they're also latin1 encoded but returned as unicode
-			song["url"] = _unicode_url(song["url"])
-			# Generator
-			yield song
-
-def sort_album(album):
-	"""Sort album in track order"""
-	def get_track_number(rec):
-		try:
-			tnr = int(rec["tracknr"])
-		except (KeyError, ValueError):
-			tnr = 0
-		return tnr
-	album.sort(key=get_track_number)
-
-def sort_album_order(songs):
-	"""Sort songs in order by album then by track number"""
-	pass
-
-	def get_album_order(rec):
-		try:
-			tnr = int(rec["tracknr"])
-		except (KeyError, ValueError):
-			tnr = 0
-		return (rec["album"], tnr)
-	songs.sort(key=get_album_order)
-
-def parse_xmms2_albums(songs):
-	albums = {}
-	for song in songs:
-		song_artist = song["artist"]
-		if not song_artist:
-			continue
-		song_album = song["album"]
-		if not song_album:
-			continue
-		album = albums.get(song_album, [])
-		album.append(song)
-		albums[song_album] = album
-	# sort album in track order
-	for album in albums:
-		sort_album(albums[album])
-	return albums
-
-def parse_xmms2_artists(songs):
-	artists = {}
-	for song in songs:
-		song_artist = song["artist"]
-		if not song_artist:
-			continue
-		artist = artists.get(song_artist, [])
-		artist.append(song)
-		artists[song_artist] = artist
-	# sort in album + track order
-	for artist in artists:
-		sort_album_order(artists[artist])
-	return artists
-
-def get_current_song():
-	"""Returns the current song as a dict"""
-	for line in _playlist_lines():
-		if line.startswith("->"):
-			return _parse_line(line)
-
-def get_playlist_songs():
-	"""Yield the IDs of all songs in the current playlist"""
-	for line in _playlist_lines():
-		if line.startswith("  [") or line.startswith("->["):
-			song = _parse_line(line)
-			yield song["id"]
-
-def _playlist_lines():
-	toolProc = subprocess.Popen([XMMS2, "list"], stdout=subprocess.PIPE)
-	stdout, stderr = toolProc.communicate()
-	return stdout.splitlines()
-
-def _parse_line(line):
-	# nyxmms2 list output format:
-	# ->[5/295] Lily Allen - I Could Say (04:05)
-	song = {}
-	song["id"] = int(line[line.find("/") + 1:line.find("]")])
-	song["artist"] = line[line.find("]") + 2:line.find(" - ")]
-	song["title"] = line[line.find(" - ") + 3:line.rfind(" (")]
-	return song
