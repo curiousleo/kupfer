@@ -22,6 +22,7 @@
               <object class="GtkNotebook" id="preferences_notebook">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <signal name="switch_page" handler="on_preferences_notebook_switch_page"/>
                 <child>
                   <object class="GtkHBox" id="hbox2">
                     <property name="visible">True</property>

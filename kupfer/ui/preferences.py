@@ -289,14 +289,18 @@ class PreferencesWindowController (pretty.OutputMixin):
 			# Read installed file and modify it
 			dfile = desktop.DesktopEntry(desktop_file_path)
 			executable = dfile.getExec()
+			## append no-splash
 			if "--no-splash" not in executable:
 				executable += " --no-splash"
-				dfile.set("Exec", executable)
+			dfile.set("Exec", executable)
 		else:
 			dfile = desktop.DesktopEntry(autostart_file)
 		activestr = str(bool(widget.get_active())).lower()
 		self.output_debug("Setting autostart to", activestr)
 		dfile.set(AUTOSTART_KEY, activestr)
+		## remove the format specifiers
+		executable = dfile.getExec().replace("%F", "")
+		dfile.set("Exec", executable)
 		dfile.write(filename=autostart_file)
 
 	def on_entrykeybinding_changed(self, widget):
@@ -797,11 +801,20 @@ class PreferencesWindowController (pretty.OutputMixin):
 			self._update_alternative_combobox(category_key,
 					self.icons_combobox)
 
+	def on_preferences_notebook_switch_page(self, notebook, page, page_num):
+		## focus the search box on the plugin tab
+		if page_num == PLUGIN_LIST_PAGE:
+			gobject.idle_add(self.entry_plugins_filter.grab_focus)
+
 	def show(self, timestamp):
 		self.window.present_with_time(timestamp)
+
 	def show_on_screen(self, timestamp, screen):
 		self.window.set_screen(screen)
 		self.show(timestamp)
+		## focus the search box on the plugin tab
+		if self.preferences_notebook.get_current_page() == PLUGIN_LIST_PAGE:
+			self.entry_plugins_filter.grab_focus()
 
 	def show_focus_plugin(self, plugin_id, timestamp):
 		"""
