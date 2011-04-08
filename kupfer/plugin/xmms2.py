@@ -214,8 +214,7 @@ class ToggleRepeat (RunnableLeaf):
 	def get_description(self):
 		return _("Toggle repeat playlist in XMMS2")
 	def get_icon_name(self):
-		# FIXME: This is not the correct icon
-		return "edit-undo"
+		return "media-playlist-repeat"
 
 class Shuffle (RunnableLeaf):
 	def __init__(self):
@@ -224,8 +223,8 @@ class Shuffle (RunnableLeaf):
 		utils.spawn_async(([XMMS2] + "playlist shuffle".split(" ")))
 	def get_description(self):
 		return _("Shuffle playlist in XMMS2")
-	# def get_icon_name(self):
-		# FIXME: Find correct icon
+	def get_icon_name(self):
+		return "media-playlist-shuffle"
 
 def _songs_from_leaf(leaf):
 	"return a sequence of songs from @leaf"
