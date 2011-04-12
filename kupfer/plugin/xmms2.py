@@ -3,7 +3,7 @@
 __kupfer_name__ = _("XMMS2")
 __kupfer_sources__ = ("XMMS2Source", )
 __description__ = _("Play and enqueue tracks and browse the music library")
-__version__ = ""
+__version__ = "12/04/2011"
 __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 
 # This code is heavily based on Ulrik Sverdrup's Rhythmbox Plugin
