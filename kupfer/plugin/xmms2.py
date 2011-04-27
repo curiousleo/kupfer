@@ -200,6 +200,8 @@ class ClearQueue (RunnableLeaf):
 		RunnableLeaf.__init__(self, name=_("Clear Queue"))
 	def run(self):
 		utils.spawn_async_raise((XMMS2, "playlist", "clear"))
+	def get_description(self):
+		return _("Clear XMMS2 queue")
 	def get_icon_name(self):
 		return "edit-clear"
 
