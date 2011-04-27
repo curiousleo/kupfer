@@ -122,13 +122,13 @@ def play_song(info):
 	if song_id in get_playlist_songs():
 		_jump_and_play(song_id); return
 
-	utils.spawn_async((XMMS2, "add", "id:%d" % song_id))
+	utils.spawn_async_raise((XMMS2, "add", "id:%d" % song_id))
 	# Ensure that the song is first added so we can jump to it afterwards.
 	glib.timeout_add(100, _jump_and_play, song_id)
 
 def _jump_and_play(song_id):
-	utils.spawn_async((XMMS2, "jump", "id:%d" % song_id))
-	utils.spawn_async((XMMS2, "play"))
+	utils.spawn_async_raise((XMMS2, "jump", "id:%d" % song_id))
+	utils.spawn_async_raise((XMMS2, "play"))
 	# must return False so it's not called again
 	return False
 
@@ -137,16 +137,16 @@ def enqueue_songs(info, clear_queue=False):
 	if not songs:
 		return
 	if clear_queue:
-		utils.spawn_async((XMMS2, "playlist", "clear"))
+		utils.spawn_async_raise((XMMS2, "playlist", "clear"))
 	for song in songs:
 		song_id = song["id"]
-		utils.spawn_async((XMMS2, "add", "id:%s" % song_id))
+		utils.spawn_async_raise((XMMS2, "add", "id:%s" % song_id))
 
 class Play (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Play"))
 	def run(self):
-		utils.spawn_async((XMMS2, "play"))
+		utils.spawn_async_raise((XMMS2, "play"))
 	def get_description(self):
 		return _("Resume playback in XMMS2")
 	def get_icon_name(self):
@@ -156,7 +156,7 @@ class Pause (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Pause"))
 	def run(self):
-		utils.spawn_async((XMMS2, "pause"))
+		utils.spawn_async_raise((XMMS2, "pause"))
 	def get_description(self):
 		return _("Pause playback in XMMS2")
 	def get_icon_name(self):
@@ -166,7 +166,7 @@ class Next (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Next"))
 	def run(self):
-		utils.spawn_async((XMMS2, "next"))
+		utils.spawn_async_raise((XMMS2, "next"))
 	def get_description(self):
 		return _("Jump to next track in XMMS2")
 	def get_icon_name(self):
@@ -176,7 +176,7 @@ class Previous (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Previous"))
 	def run(self):
-		utils.spawn_async((XMMS2, "prev"))
+		utils.spawn_async_raise((XMMS2, "prev"))
 	def get_description(self):
 		return _("Jump to previous track in XMMS2")
 	def get_icon_name(self):
@@ -199,7 +199,7 @@ class ClearQueue (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Clear Queue"))
 	def run(self):
-		utils.spawn_async((XMMS2, "playlist", "clear"))
+		utils.spawn_async_raise((XMMS2, "playlist", "clear"))
 	def get_icon_name(self):
 		return "edit-clear"
 
@@ -210,7 +210,7 @@ class ToggleRepeat (RunnableLeaf):
 		toggle = int(
 			_cmd_output("server config playlist.repeat_all".split(" "))[0][-1])
 		toggle = (toggle + 1) % 2
-		utils.spawn_async(([XMMS2] + ("server config playlist.repeat_all %d" % toggle).split(" ")))
+		utils.spawn_async_raise(([XMMS2] + ("server config playlist.repeat_all %d" % toggle).split(" ")))
 	def get_description(self):
 		return _("Toggle repeat playlist in XMMS2")
 	def get_icon_name(self):
@@ -220,7 +220,7 @@ class Shuffle (RunnableLeaf):
 	def __init__(self):
 		RunnableLeaf.__init__(self, name=_("Shuffle"))
 	def run(self):
-		utils.spawn_async(([XMMS2] + "playlist shuffle".split(" ")))
+		utils.spawn_async_raise(([XMMS2] + "playlist shuffle".split(" ")))
 	def get_description(self):
 		return _("Shuffle playlist in XMMS2")
 	def get_icon_name(self):
