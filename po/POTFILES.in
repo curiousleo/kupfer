@@ -37,7 +37,6 @@ kupfer/plugin/core/commands.py
 kupfer/plugin/core/contents.py
 kupfer/plugin/core/debug.py
 kupfer/plugin/core/__init__.py
-kupfer/plugin/core/selection.py
 kupfer/plugin/core/text.py
 kupfer/plugin/core/internal.py
 kupfer/plugin/archivemanager.py
@@ -51,6 +50,7 @@ kupfer/plugin/epiphany.py
 kupfer/plugin/favorites.py
 kupfer/plugin/fileactions.py
 kupfer/plugin/firefox.py
+kupfer/plugin/multihead.py
 kupfer/plugin/nautilusselection.py
 kupfer/plugin/notes.py
 kupfer/plugin/rhythmbox.py
@@ -120,6 +120,7 @@ kupfer/plugin/tracker1.py
 kupfer/plugin/truecrypt.py
 kupfer/plugin/tsclient.py
 kupfer/plugin/vinagre.py
-kupfer/plugin/vim.py
+kupfer/plugin/vim/__init__.py
+kupfer/plugin/vim/plugin.py
 kupfer/plugin/virtualbox/__init__.py
 kupfer/plugin/zim.py

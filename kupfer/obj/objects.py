@@ -11,6 +11,7 @@ see the main program file, and COPYING for details.
 import os
 from os import path
 
+import gio
 import gobject
 
 from kupfer import icons, launch, utils
@@ -95,6 +96,9 @@ class FileLeaf (Leaf, TextRepresentation):
 
 	def get_text_representation(self):
 		return gobject.filename_display_name(self.object)
+
+	def get_urilist_representation(self):
+		return [gio.File(path=self.object).get_uri()]
 
 	def get_description(self):
 		return utils.get_display_path_for_bytestring(self.canonical_path())
@@ -315,7 +319,7 @@ class Launch (Action):
 	def get_icon_name(self):
 		if self.is_running:
 			return "go-jump"
-		return Action.get_icon_name(self)
+		return "kupfer-launch"
 
 class LaunchAgain (Launch):
 	rank_adjust = 0
@@ -380,7 +384,7 @@ class RunnableLeaf (Leaf):
 		iname = self.get_icon_name()
 		if iname:
 			return icons.get_gicon_with_fallbacks(None, (iname, ))
-		return icons.ComposedIcon("kupfer-object", "gtk-execute")
+		return icons.ComposedIcon("kupfer-object", "kupfer-execute")
 	def get_icon_name(self):
 		return ""
 
@@ -410,9 +414,8 @@ class TextLeaf (Leaf, TextRepresentation):
 		"""@text *must* be unicode or UTF-8 str"""
 		text = tounicode(text)
 		if not name:
-			lines = [l for l in text.splitlines() if l.strip()]
-			name = lines[0] if lines else text
-		if len(text) == 0:
+			name = self.get_first_text_line(text)
+		if len(text) == 0 or not name:
 			name = _("(Empty Text)")
 		Leaf.__init__(self, text, name)
 
@@ -422,10 +425,24 @@ class TextLeaf (Leaf, TextRepresentation):
 	def repr_key(self):
 		return hash(self.object)
 
+	@classmethod
+	def get_first_text_line(cls, text):
+		firstline = None
+		firstnl = text.find("\n")
+		if firstnl != -1:
+			firstline = text[:firstnl].strip()
+			if not firstline:
+				splut = text.split(None, 1)
+				firstline = splut[0] if splut else text
+		else:
+			firstline = text
+		if not firstline:
+			firstline = text.strip("\n")
+		return firstline
+
 	def get_description(self):
-		lines = [l for l in self.object.splitlines() if l.strip()]
-		desc = lines[0] if lines else self.object
-		numlines = len(lines) or 1
+		numlines = self.object.count("\n") + 1
+		desc = self.get_first_text_line(self.object)
 
 		# TRANS: This is description for a TextLeaf, a free-text search
 		# TRANS: The plural parameter is the number of lines %(num)d
