@@ -71,20 +71,9 @@ def get_xmms2_songs(dbfile):
 		for row in cu:
 			# NEEDED_KEYS and returned rows must have the same order for this to work
 			song = dict(zip((NEEDED_KEYS), row))
-			song["url"] = _unicode_url(song["url"])
-			# Generator
+			# Spaces in the URLs in the database are encoded as pluses
+			song["url"] = song["url"].replace('+', ' ')
 			yield song
-
-def _unicode_url(rawurl):
-	"""Converts latin-1 encoded string from xmms2 medialib
-	to unicode
-
-	>>> _unicode_url(
-	...		u"file:///home/Music/B%c3%a9nabar+%282001%29+B%c3%a9nabar/08+Coup+du+lapin.m4a")
-	u'file:///home/Music/B\\xe9nabar (2001) B\\xe9nabar/08 Coup du lapin.m4a'
-	"""
-
-	return urllib.unquote_plus(rawurl).encode('latin1').decode('utf-8')
 
 def get_current_song():
 	"""Returns the current song as a dict"""
