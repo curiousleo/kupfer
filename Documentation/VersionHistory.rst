@@ -3,46 +3,78 @@
 NEWS for kupfer
 ===============
 
-kupfer v205 and v206
---------------------
+kupfer v206
+-----------
 
-Not Released Yet
+`The longest changelog ever—the best Kupfer ever?`:t:
 
-These are changes since the v205 release. See also the changelog below for
-all the features introduced in v205.
+Released Thursday, 14 April 2011
 
-* *Thunderbird* fix double create email windows (:lp:`747198`)
+These are changes since the v205 release. Below this I have included, the
+full changelog for all the features introduced in v205, since it was not
+published in whole together with the v205 release.
+
+I would like to thank all contributors for patches, bug reports, comments
+and translations. A special thanks to those who have contributed to the
+`user documentation`__; it is now complete in both Polish and Spanish.
+
+If you like my work with Kupfer, you can support me by donating. There are
+instructions how to do so on the web page. –ulrik.
+
+__ http://kaizer.se/wiki/kupfer/help/
+
+* *Thunderbird:* fix double create email windows (:lp:`747198`)
+* *Thunderbird:* fix problem with loading contacts (Karol Będkowski)
+  (:lp:`747438`)
 * Use ``rst2man`` as it was configured (:lp:`747500`)
-* Reduce long-term memory use for icons substantially
+* Reduce runtime memory use for substantially by reimplementing the icon
+  cache (expectations vary btw. 10 to 30 percent).
 * Prefer gnomekeyring over kwallet, and don't load keyring support if it is
   not requested by a plugin (:lp:`747864`)
 * Make the "folder" icon take precedence over "inode/directory"
 * Fix a regression in *Go To* that would not focus minimized windows.
-* Fix :lp:`671105`: the user's home is aliased as Home Folder and the
-  lookalike application is hidden.
+* In *Go To* action, cycle application windows (if they are all on the same
+  workspace).
+* Fix :lp:`671105`: the user's home is aliased as *Home Folder* and the
+  "lookalike" application is hidden.
 * Use GTK+ as default icon set, the ASCII icon set remains as a plugin
-* Fix regression :lp:`749824`, kupfer used a GTK+ 2.20 feature. It should
-  now run under GTK+ 2.18 (2.16?). GTK+ 2.20 is recommended and needed for
-  full input method support.
-* Add quirks for ``.desktop`` files written by wine as reported by a user.
+* Fix regression :lp:`749824`, kupfer used a GTK+ 2.20 feature. Kupfer
+  should now run under GTK+ 2.18 (2.16?). GTK+ 2.20 is recommended and
+  needed for full input method support.
+* Remake ``.desktop`` file parsing to be much more lenient, so that we
+  can launch all applications again. Affected were especially launcher files
+  written by wine.
 * Make sure the ``Home`` key works in text mode (:lp:`750240`)
-* *Rhythmbox* Fix omission of ``.jpg`` extension when searching cover art
+* *Rhythmbox:* Fix omission of ``.jpg`` extension when searching cover art
   (William Friesen)
 * Support xfce4-dict in *Dictionary* plugin (David Schneider)
 * Make sure ``kupfer.svg`` can be mimetype-detected (NAKAMURA Yoshitaka)
   (:lp:`750488`)
 * Fix regression that prevented mimetypes and icon cache from being updated
   properly when installing from source.
-* In *Go To* action, cycle application windows (if they are all on the same
-  workspace).
 * Focus the plugin list search box by default in the preferences window.
 * Fix regression in *XFCE Session Management* that had a broken logout
   command.
 * Install kupfer as a Thunar 'sendto' object.
 * Fix a bug in the autostart file we installed, it was including a '%F'
   which broke ``--no-splash`` when autostarted on XFCE.
+* *LibreOffice:* support their newer recent documents file (Karol Będkowski)
+* *Notes:* Insert newlines after the new note title (:lp:`748991`)
+* *Commands:* Recognize absolute paths with arguments as shell commands (for
+  example ``/bin/grep --help``. (:lp:`152093`)
+* *GNU Screen:* check if sessions are still active (:lp:`756449`), don't
+  give up even if ``$SCREENDIR`` is missing when we are started
+  (:lp:`753376`)
+* *Notes:* support the program kzrnote as well
+* Renamed the two like-named command actions in spanish (Daniel Mustieles)
+ 
+* Localization updates for v206:
 
-These are the full change explanations of the v205 release
+  + sl Andrej Žnidaršič
+  + es Daniel Mustieles
+  + de Mario Blättermann
+
+This is the changelog for the v205 release, which was released previously.
 
 * Changes to the interface
 
@@ -127,7 +159,7 @@ These are the full change explanations of the v205 release
 
   + Support running kupfer on multiple X screens (:lp:`614796`), use
     the command ``kupfer --relay`` on each additional screen for global
-    keyboard shortcut support.
+    keyboard shortcut support. This is experimental until further notice!
 
 * The *Tracker 0.8* plugin supports version 0.8 and 0.10 alike. Because of
   that and the expected compatibility with one version after this too, it's
@@ -145,12 +177,12 @@ These are the full change explanations of the v205 release
   workspaces, in order, if they have windows from the same application.  For
   single-window applications, nothing is changed.
  
-* Localization updates:
+* Localization updates for v205:
 
   + (cs) Marek Černocký
   + (de) Mario Blättermann
   + (es) Daniel Mustieles
-  + (ko) Kim Boram 김보람
+  + (ko) Kim Boram
   + (nb) Kjartan Maraas
   + (pl) Karol Będkowski
   + (sl) Andrej Žnidaršič
