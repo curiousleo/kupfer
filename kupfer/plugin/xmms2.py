@@ -3,7 +3,7 @@
 __kupfer_name__ = _("XMMS2")
 __kupfer_sources__ = ("XMMS2Source", )
 __description__ = _("Play and enqueue tracks and browse the music library")
-__version__ = ""
+__version__ = "29/04/2011"
 __author__ = "Leonhard Markert <curiousleo@ymail.com>"
 
 # This code is heavily based on Ulrik Sverdrup's Rhythmbox Plugin
@@ -547,7 +547,3 @@ class XMMS2Source (AppLeafContentMixin, Source):
 		yield RunnableLeaf
 		yield SourceLeaf
 		yield SongLeaf
-
-if __name__ == '__main__':
-	import doctest
-	doctest.testmod()
