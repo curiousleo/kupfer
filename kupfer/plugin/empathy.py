@@ -12,6 +12,7 @@ import time
 
 from kupfer import icons
 from kupfer import plugin_support
+from kupfer import pretty
 from kupfer.objects import Leaf, Action, Source, AppLeaf
 from kupfer.weaklib import dbus_signal_connect_weakly
 from kupfer.obj.helplib import PicklingHelperMixin
@@ -67,10 +68,13 @@ EMPATHY_ACCOUNT_KEY = "EMPATHY_ACCOUNT"
 EMPATHY_CONTACT_ID = "EMPATHY_CONTACT_ID"
 
 def _create_dbus_connection():
-	sbus = dbus.SessionBus()
-	proxy_obj = sbus.get_object(ACCOUNTMANAGER_IFACE, ACCOUNTMANAGER_PATH)
-	dbus_iface = dbus.Interface(proxy_obj, DBUS_PROPS_IFACE)
-	return dbus_iface
+	try:
+		sbus = dbus.SessionBus()
+		proxy_obj = sbus.get_object(ACCOUNTMANAGER_IFACE, ACCOUNTMANAGER_PATH)
+		dbus_iface = dbus.Interface(proxy_obj, DBUS_PROPS_IFACE)
+		return dbus_iface
+	except dbus.DBusException as exc:
+		pretty.print_exc(__name__)
 
 
 class EmpathyContact(JabberContact):
@@ -206,14 +210,22 @@ class ContactsSource(AppLeafContentMixin, ToplevelGroupingSource,
 			channels = connection.ListChannels()
 			for channel in channels:
 				contact_group = bus.get_object(connection_iface, channel[0])
-				contacts = contact_group.Get(CHANNEL_GROUP_IFACE, "Members")
+				try:
+					contacts = contact_group.Get(CHANNEL_GROUP_IFACE, "Members")
+				except dbus.exceptions.DBusException, ex:
+					self.output_info(ex)
+					contacts = None
 				if contacts:
 						contacts = [c for c in contacts]
 						contact_attributes = connection.Get(CONTACT_IFACE, "ContactAttributeInterfaces")
 						contact_attributes = [str(a) for a in contact_attributes]
 						contact_details = connection.GetContactAttributes(contacts, contact_attributes, False)
 						for contact, details in contact_details.iteritems():
-								status_code = details[_ATTRIBUTES.get("presence")][1]
+								try:
+									status_code = details[_ATTRIBUTES.get("presence")][1]
+								except KeyError, ex:
+									self.output_info('Presence could not be established with %s. Leaving unknown.' % ex)
+									status_code = u'unknown'
 								if not show_offline and status_code == 'offline':
 									continue
 								yield EmpathyContact(
