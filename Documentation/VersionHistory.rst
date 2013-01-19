@@ -3,15 +3,33 @@
 NEWS for kupfer
 ===============
 
-the upcoming incarnation of kupfer, summoner of stuff
------------------------------------------------------
+kupfer v208
+-----------
 
-Not Yet Released
+Released Friday,  1 June 2012
 
-* Pressing and holding a letter key will highlight the current command
-  and activate it when the key is released (David Schneider and Ulrik)
-* Holding shift and typing will search in the action pane. (David Schneider
-  and Ulrik)
+* Fix bug with nonexisting catalog directories (Karol) (:lp:`1000980`)
+* Fix sending to many with Thunderbird (Karol) (:lp:`955100`)
+* Fix history file for OpenOffice/LibreOffice (Karol)
+* *Audacious* plugin: Work with Audacious 3 (Ulrik)
+
+* Localization updates:
+
+  + cs, Marek Černocký
+  + es, Daniel Mustieles
+  + fr, Alexandre Franke, Bruno Brouard
+  + ru, Nikolay Barbariyskiy
+  + sl, Matej Urbančič
+
+
+kupfer v207
+-----------
+
+Released Sunday, 26 February 2012
+
+* Documentation translated to French by Bruno Brouard
+* New translation to Brazilian Portuguese by Djavan Fagundes
+* New translation to Hungarian by SanskritFritz
 * Handle large text objects a bit better
 * Introduce proxy objects *Clipboard File* and *Clipboard Text*. These
   objects are implemented in the *Clipboard* plugin, just like the *Selected
@@ -35,14 +53,32 @@ Not Yet Released
 * Use themable custom icon names ``kupfer-execute``, ``kupfer-catalog``,
   ``kupfer-launch``. Also allow plugins to choose to supply icons when the
   icon theme lacks them, or always override the icon theme.
+* Fix passing zero-length arguments to programs (Fabián Ezequiel Gallina)
+  (:lp:`863349`)
+* *Gmail:* Expose more contact info fields (Adi Sieker, Karol Będkowski)
+* Add plugin *DuckDuckGo* (Isaac Aggrey)
+* Add quick note action to *Zim* (Karol Będkowski)
+* Add *Edit Contact in Gmail* to *Gmail* (Karol)
+* Fix version detection in *Gajim* (Karol)
+* *Google Translate:* Since Google no longer provides this API (for free),
+  this plugin is no longer included in Kupfer.
+* Fix compatibility with dbus-python version 1.0 (:lp:`921829`)
+* Fix loss of window shape when centering (David Schneider) (:lp:`779845`)
+* We are now using the format .tar.xz for the distribution tarball.
+* The git repository and tarball now includes a local copy of waf (1.6.11),
+  unmodified but with unused in Tools/ and extras/ removed.
 
 * Localization updates:
 
   + (cs) Marek Černocký
   + (de) Mario Blättermann
+  + (fr) Bruno Brouard
   + (es) Daniel Mustieles
   + (hu) SanskritFritz
+  + (pl) Piotr Drąg
+  + (pt_BR) Djavan Fagundes
   + (sl) Andrej Žnidaršič
+  + (sv) Ulrik
 
 
 kupfer v206
